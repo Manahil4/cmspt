@@ -1,0 +1,223 @@
+To build a Behance-like website with separate user roles (clients and designers) using Django, you will need to set up user authentication and profile management with custom user roles. Here's a step-by-step guide to achieve this:
+
+### Step 1: Set Up Django Project
+
+First, ensure you have Django installed and create a new Django project and app:
+
+```bash
+django-admin startproject behance_clone
+cd behance_clone
+django-admin startapp users
+```
+
+### Step 2: Configure Custom User Model
+
+In `users/models.py`, create a custom user model that includes different roles:
+
+```python
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+
+class User(AbstractUser):
+    ROLE_CHOICES = (
+        ('client', 'Client'),
+        ('designer', 'Designer'),
+    )
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES)
+    bio = models.TextField(blank=True, null=True)
+    profile_picture = models.ImageField(upload_to='profile_pics/', blank=True, null=True)
+    social_links = models.JSONField(blank=True, null=True)
+```
+
+### Step 3: Update Settings
+
+In `behance_clone/settings.py`, update the `AUTH_USER_MODEL` to use the custom user model:
+
+```python
+AUTH_USER_MODEL = 'users.User'
+```
+
+### Step 4: Create User Forms
+
+Create forms for user registration in `users/forms.py`:
+
+```python
+from django import forms
+from django.contrib.auth.forms import UserCreationForm
+from .models import User
+
+class CustomUserCreationForm(UserCreationForm):
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ('username', 'email', 'role', 'bio', 'profile_picture', 'social_links')
+
+class CustomUserChangeForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ('username', 'email', 'role', 'bio', 'profile_picture', 'social_links')
+```
+
+### Step 5: Create Views for Registration and Profile Management
+
+In `users/views.py`, create views for user registration and profile management:
+
+```python
+from django.shortcuts import render, redirect
+from django.contrib.auth import login, authenticate
+from .forms import CustomUserCreationForm, CustomUserChangeForm
+from .models import User
+
+def register(request):
+    if request.method == 'POST':
+        form = CustomUserCreationForm(request.POST, request.FILES)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            return redirect('profile', username=user.username)
+    else:
+        form = CustomUserCreationForm()
+    return render(request, 'users/register.html', {'form': form})
+
+def profile(request, username):
+    user = User.objects.get(username=username)
+    if request.method == 'POST':
+        form = CustomUserChangeForm(request.POST, request.FILES, instance=user)
+        if form.is_valid():
+            form.save()
+            return redirect('profile', username=user.username)
+    else:
+        form = CustomUserChangeForm(instance=user)
+    return render(request, 'users/profile.html', {'form': form, 'user': user})
+```
+
+### Step 6: Create URLs
+
+In `users/urls.py`, define the URLs for registration and profile management:
+
+```python
+from django.urls import path
+from .views import register, profile
+
+urlpatterns = [
+    path('register/', register, name='register'),
+    path('profile/<str:username>/', profile, name='profile'),
+]
+```
+
+Include these URLs in your main project `urls.py`:
+
+```python
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('users/', include('users.urls')),
+]
+```
+
+### Step 7: Create Templates
+
+Create templates for registration and profile management in `users/templates/users/`:
+
+**register.html:**
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Register</title>
+</head>
+<body>
+    <h2>Register</h2>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Register</button>
+    </form>
+</body>
+</html>
+```
+
+**profile.html:**
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Profile</title>
+</head>
+<body>
+    <h2>{{ user.username }}'s Profile</h2>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Save</button>
+    </form>
+</body>
+</html>
+```
+
+### Step 8: Migrate and Create Superuser
+
+Run migrations and create a superuser to manage your project:
+
+```bash
+python manage.py makemigrations
+python manage.py migrate
+python manage.py createsuperuser
+```
+
+### Step 9: Configure Media Files
+
+Ensure your project can serve media files during development by adding these settings in `behance_clone/settings.py`:
+
+```python
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+```
+
+And in your main `urls.py`:
+
+```python
+from django.conf import settings
+from django.conf.urls.static import static
+
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+```
+
+### Step 10: Add Permissions and Access Control
+
+To manage different roles (clients and designers), you can use Django's built-in permissions system or create custom decorators and middleware to control access based on user roles.
+
+For example, you can create a decorator in `users/decorators.py` to restrict access:
+
+```python
+from django.core.exceptions import PermissionDenied
+
+def user_is_designer(function):
+    def wrap(request, *args, **kwargs):
+        if request.user.role == 'designer':
+            return function(request, *args, **kwargs)
+        else:
+            raise PermissionDenied
+    return wrap
+```
+
+Then use this decorator in your views to restrict access:
+
+```python
+from django.shortcuts import render
+from .decorators import user_is_designer
+
+@user_is_designer
+def designer_dashboard(request):
+    # View for designer-specific functionality
+    return render(request, 'designer_dashboard.html')
+```
+
+### Conclusion
+
+By following these steps, you'll set up a Django project with custom user roles for clients and designers. This approach provides a solid foundation for building more advanced features, like project uploads, community interactions, and search functionality, as you progress with your Behance-like web application.

@@ -1,0 +1,247 @@
+For your project, which focuses on a design portfolio and order management system with specific roles for clients and designers, you will need to rename the functions to match the functionalities related to your project's requirements. Here's how you can rename the functions and adjust the `urls.py` to fit your project's context:
+
+### Updated URL Patterns
+Replace the existing URL patterns with names relevant to your project.
+
+```python
+from django.urls import path
+from .views import (
+    home, sign_up, sign_in, sign_out, settings, change_password, custom_password_reset,
+    portfolio_page, portfolio_item_detail, about_us, order_list, order_detail,
+    start_discussion, discussion_detail, add_comment,
+    designer_dashboard, client_dashboard, designer_specific_view, client_specific_view
+)
+
+urlpatterns = [
+    path('', home, name='home'),
+    path('sign_up/', sign_up, name='sign_up'),
+    path('sign_in/', sign_in, name='sign_in'),
+    path('sign_out/', sign_out, name='sign_out'),
+    path('settings/', settings, name='settings'),
+    path('change_password/', change_password, name='change_password'),
+    path('custom_password_reset/', custom_password_reset, name='custom_password_reset'),
+    path('portfolio/', portfolio_page, name='portfolio_page'),
+    path('portfolio/<int:item_id>/', portfolio_item_detail, name='portfolio_item_detail'),
+    path('about_us/', about_us, name='about_us'),
+    path('orders/', order_list, name='order_list'),
+    path('orders/<int:order_id>/', order_detail, name='order_detail'),
+    path('discussions/', start_discussion, name='start_discussion'),
+    path('discussions/<int:discussion_id>/', discussion_detail, name='discussion_detail'),
+    path('add_comment/<int:discussion_id>/', add_comment, name='add_comment'),
+    path('designer_dashboard/', designer_dashboard, name='designer_dashboard'),
+    path('client_dashboard/', client_dashboard, name='client_dashboard'),
+    path('designer_specific_view/', designer_specific_view, name='designer_specific_view'),
+    path('client_specific_view/', client_specific_view, name='client_specific_view'),
+]
+```
+
+### Updated Views
+Here's an updated `views.py` file with functions renamed and adapted to your project's context.
+
+```python
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth import login, authenticate, logout, update_session_auth_hash
+from django.contrib import messages
+from django.contrib.auth.forms import PasswordChangeForm
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.views import PasswordResetView
+from .models import CustomUser, PortfolioItem, Order, Discussion, Comment
+from .forms import SignUpForm, SignInForm, UserUpdateForm, DiscussionForm, CommentForm
+import requests
+
+def home(request):
+    return render(request, 'home.html')
+
+def sign_up(request):
+    if request.method == 'POST':
+        form = SignUpForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            return redirect('home')
+    else:
+        form = SignUpForm()
+    return render(request, 'registration/sign_up.html', {'form': form})
+
+def sign_in(request):
+    if request.method == 'POST':
+        form = SignInForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            return redirect('home')
+    else:
+        form = SignInForm()
+    return render(request, 'registration/sign_in.html', {'form': form})
+
+def sign_out(request):
+    logout(request)
+    return redirect('home')
+
+@login_required
+def settings(request):
+    if request.method == 'POST':
+        form = UserUpdateForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            return redirect('home')
+    else:
+        form = UserUpdateForm(instance=request.user)
+
+    return render(request, 'settings.html', {'form': form})
+
+@login_required
+def change_password(request):
+    if request.method == 'POST':
+        password_change_form = PasswordChangeForm(request.user, request.POST)
+        if password_change_form.is_valid():
+            user = password_change_form.save()
+            update_session_auth_hash(request, user)
+            messages.success(request, 'Password changed successfully.')
+            return redirect('settings')
+    else:
+        password_change_form = PasswordChangeForm(request.user)
+
+    return render(request, 'change_password.html', {
+        'password_change_form': password_change_form,
+    })
+
+def custom_password_reset(request):
+    return PasswordResetView.as_view(
+        request,
+        template_name='forgot_password.html',
+        email_template_name='forgot_password_email.html',
+        subject_template_name='forgot_password_subject.txt',
+        post_reset_redirect='/sign_in/',
+    )
+
+def portfolio_page(request):
+    portfolio_items = PortfolioItem.objects.all()
+    return render(request, 'portfolio/portfolio_page.html', {'portfolio_items': portfolio_items})
+
+def portfolio_item_detail(request, item_id):
+    portfolio_item = get_object_or_404(PortfolioItem, pk=item_id)
+    return render(request, 'portfolio/portfolio_item_detail.html', {'portfolio_item': portfolio_item})
+
+def about_us(request):
+    return render(request, 'about_us.html')
+
+@login_required
+def order_list(request):
+    if request.user.role != 'client':
+        return redirect('home')
+    orders = Order.objects.filter(client=request.user)
+    return render(request, 'orders/order_list.html', {'orders': orders})
+
+@login_required
+def order_detail(request, order_id):
+    if request.user.role != 'client':
+        return redirect('home')
+    order = get_object_or_404(Order, pk=order_id, client=request.user)
+    return render(request, 'orders/order_detail.html', {'order': order})
+
+@login_required
+def start_discussion(request):
+    if request.method == 'POST':
+        form = DiscussionForm(request.POST)
+        if form.is_valid():
+            new_discussion = form.save(commit=False)
+            new_discussion.author = request.user
+            new_discussion.save()
+            return redirect('discussion_detail', discussion_id=new_discussion.id)
+    else:
+        form = DiscussionForm()
+
+    discussions = Discussion.objects.all()
+    return render(request, 'discussions/start_discussion.html', {'discussions': discussions, 'form': form})
+
+@login_required
+def discussion_detail(request, discussion_id):
+    discussion = get_object_or_404(Discussion, pk=discussion_id)
+    comments = discussion.comments.all()
+
+    if request.method == 'POST':
+        form = CommentForm(request.POST)
+        if form.is_valid():
+            new_comment = form.save(commit=False)
+            new_comment.discussion = discussion
+            new_comment.author = request.user
+            new_comment.save()
+            return redirect('discussion_detail', discussion_id=discussion.id)
+    else:
+        form = CommentForm()
+
+    return render(request, 'discussions/discussion_detail.html', {'discussion': discussion, 'comments': comments, 'form': form})
+
+@login_required
+def add_comment(request, discussion_id):
+    discussion = get_object_or_404(Discussion, id=discussion_id)
+
+    if request.method == 'POST':
+        form = CommentForm(request.POST)
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.discussion = discussion
+            comment.author = request.user
+            comment.save()
+            return redirect('discussion_detail', discussion_id=discussion.id)
+    else:
+        form = CommentForm()
+
+    return render(request, 'discussions/add_comment.html', {'form': form, 'discussion': discussion})
+
+# New Views for Designer and Client Dashboards
+@login_required
+def designer_dashboard(request):
+    if request.user.role != 'designer':
+        return redirect('home')
+    # Add specific designer logic here
+    return render(request, 'designer_dashboard.html')
+
+@login_required
+def client_dashboard(request):
+    if request.user.role != 'client':
+        return redirect('home')
+    # Add specific client logic here
+    return render(request, 'client_dashboard.html')
+
+# Decorators for Role-Based Access
+def user_is_designer(function):
+    def wrap(request, *args, **kwargs):
+        if request.user.role == 'designer':
+            return function(request, *args, **kwargs)
+        else:
+            return redirect('home')
+    return wrap
+
+def user_is_client(function):
+    def wrap(request, *args, **kwargs):
+        if request.user.role == 'client':
+            return function(request, *args, **kwargs)
+        else:
+            return redirect('home')
+    return wrap
+
+@user_is_designer
+@login_required
+def designer_specific_view(request):
+    # Designer-specific view logic
+    return render(request, 'designer_specific_view.html')
+
+@user_is_client
+@login_required
+def client_specific_view(request):
+    # Client-specific view logic
+    return render(request, 'client_specific_view.html')
+```
+
+### Explanation
+
+- **Portfolio Management**: Renamed `courses_page` to `portfolio_page` and `topics_page` to `portfolio_item_detail` to reflect portfolio items.
+- **Order Management**: Added views for `order_list` and `order_detail` to manage client orders.
+- **About Us**: Added an `about_us` view.
+- **Discussions**: Renamed views related to discussions to match the functionality needed for client and designer interactions.
+- **Role-Based Dashboards**: Added views for `designer_dashboard` and `client_dashboard` with appropriate role checks.
+- **Role-Based Access Decorators**: Added decorators to manage access to specific views based on user roles.
+
+This updated `views.py` and `urls.py` should align with the requirements of your design portfolio and order management web application. Adjust the template paths and any additional logic as necessary to match your project's structure.
