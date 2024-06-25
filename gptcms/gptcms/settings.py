@@ -37,6 +37,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'crispy_forms',
+    'rest_framework'
+    'allauth',  # Add this
+    'allauth.account',  # Add this
+    'allauth.socialaccount',  # Add this
+    'users'
+    
 ]
 
 MIDDLEWARE = [
@@ -62,6 +69,9 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'allauth.account.context_processors.account',  # Add this
+                'allauth.socialaccount.context_processors.socialaccount',  # Add this
+           
             ],
         },
     },
@@ -121,3 +131,27 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Crispy Forms settings
+CRISPY_TEMPLATE_PACK = 'bootstrap4'
+
+# Allauth settings
+AUTHENTICATION_BACKENDS = (
+   'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+
+)
+
+SITE_ID = 1
+LOGIN_REDIRECT_URL = '/'
+ACCOUNT_EMAIL_VERIFICATION = 'none'  # Optional, based on your requirement
+
+# Django REST Framework configuration (optional)
+REST_FRAMEWORK = {
+    # Example configuration
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ),
+}
+AUTH_USER_MODEL = 'users.CustomUser'

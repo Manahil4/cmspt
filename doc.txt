@@ -28,3 +28,4 @@ The `gptcms` folder is the main project directory. It sets up the basic structur
 ### Summary:
 - **`users` App**: Manages user-related functionality (created by `startapp`).
 - **`gptcms` Project**: The main configuration and entry point for your Django project (created by `startproject`).
+
