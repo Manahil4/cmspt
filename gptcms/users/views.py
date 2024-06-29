@@ -6,7 +6,7 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import PasswordResetView
 from .models import CustomUser, PortfolioItem, Order, Discussion, Comment
-from .forms import SignUpForm, SignInForm, UserUpdateForm, DiscussionForm, CommentForm
+from .forms import SignInForm, UserUpdateForm, DiscussionForm, CommentForm
 import requests
 
 def home(request):
@@ -22,6 +22,7 @@ def sign_up(request):
     else:
         form = CustomUserCreationForm()
     return render(request, 'registration/sign_up.html', {'form': form})
+
 def sign_in(request):
     if request.method == 'POST':
         form = SignInForm(request, data=request.POST)
@@ -149,22 +150,18 @@ def add_comment(request, discussion_id):
 
     return render(request, 'discussions/add_comment.html', {'form': form, 'discussion': discussion})
 
-# New Views for Designer and Client Dashboards
 @login_required
 def designer_dashboard(request):
     if request.user.role != 'designer':
         return redirect('home')
-    # Add specific designer logic here
     return render(request, 'designer_dashboard.html')
 
 @login_required
 def client_dashboard(request):
     if request.user.role != 'client':
         return redirect('home')
-    # Add specific client logic here
     return render(request, 'client_dashboard.html')
 
-# Decorators for Role-Based Access
 def user_is_designer(function):
     def wrap(request, *args, **kwargs):
         if request.user.role == 'designer':
@@ -184,11 +181,19 @@ def user_is_client(function):
 @user_is_designer
 @login_required
 def designer_specific_view(request):
-    # Designer-specific view logic
     return render(request, 'designer_specific_view.html')
 
 @user_is_client
 @login_required
 def client_specific_view(request):
-    # Client-specific view logic
     return render(request, 'client_specific_view.html')
+
+def update_profile(request):
+    if request.method == 'POST':
+        form = UserUpdateForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            return redirect('profile')
+    else:
+        form = UserUpdateForm(instance=request.user)
+    return render(request, 'update_profile.html', {'form': form})
